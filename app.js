@@ -2,6 +2,7 @@
   const stage = document.querySelector('#stage');
   const canvas = document.querySelector('#canvas');
   const ctx = canvas.getContext('2d');
+  const warpCanvas = document.createElement('canvas'), warp = warpCanvas.getContext('2d');
   const input = document.querySelector('#photo');
   const empty = document.querySelector('#empty');
   const hand = document.querySelector('#hand');
@@ -53,18 +54,25 @@
       })();
       const segmenter = await segmenterPromise;
       if (version !== imageVersion || targetImage !== photo) return;
-      segmenter.segment(photo, result => {
+      // Segment a smaller copy: the model does not need the original image's full resolution.
+      const inputCanvas=document.createElement('canvas'), scale=Math.min(1,384/Math.max(photo.width,photo.height));
+      inputCanvas.width=Math.max(1,Math.round(photo.width*scale)); inputCanvas.height=Math.max(1,Math.round(photo.height*scale));
+      inputCanvas.getContext('2d').drawImage(photo,0,0,inputCanvas.width,inputCanvas.height);
+      segmenter.segment(inputCanvas, result => {
         if (version !== imageVersion || targetImage !== photo || mode) return;
         const masks=result.confidenceMasks, m=masks && masks[masks.length-1]; if(!m) throw new Error('no mask');
-        const data=m.getAsFloat32Array(), mw=m.width, mh=m.height, path=new Path2D();
+        const data=m.getAsFloat32Array(), mw=m.width, mh=m.height;
+        const maskCanvas=document.createElement('canvas'); maskCanvas.width=mw; maskCanvas.height=mh;
+        const mctx=maskCanvas.getContext('2d'), pixels=mctx.createImageData(mw,mh);
         let left=mw,top=mh,right=0,bottom=0,count=0;
-        for(let y=0;y<mh;y++) { let start=-1; for(let x=0;x<=mw;x++) {
-          const hit=x<mw && data[y*mw+x] > .45;
-          if(hit){if(start<0) start=x;count++;left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
-          if(!hit && start>=0){path.rect(start,y,x-start,1);start=-1;}
-        }}
+        for(let y=0;y<mh;y++) for(let x=0;x<mw;x++) {
+          const confidence=data[y*mw+x];
+          const alpha=Math.max(0,Math.min(255,Math.round((confidence-.3)*255/.3)));
+          const offset=(y*mw+x)*4; pixels.data[offset]=pixels.data[offset+1]=pixels.data[offset+2]=255; pixels.data[offset+3]=alpha;
+          if(confidence>.45){count++;left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
+        }
         if(count < mw*mh*.015) {help.textContent='사람을 찾지 못했어요. 반응 영역을 직접 지정해 주세요.';return;}
-        personMask={path,width:mw,height:mh};mask=null;
+        mctx.putImageData(pixels,0,0); personMask=maskCanvas; mask=null;
         focusBounds={left:left/mw,right:(right+1)/mw,top:top/mh,bottom:(bottom+1)/mh};
         help.textContent='인물을 인식해 반응 영역을 설정했어요. 필요하면 직접 수정할 수 있습니다.';
         status.textContent='인물 위를 천천히 쓰다듬어 보세요';draw();
@@ -91,6 +99,7 @@
     width = rect.width; height = rect.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
     overlay.width=canvas.width; overlay.height=canvas.height; octx.setTransform(dpr,0,0,dpr,0,0); paintOverlay();
+    warpCanvas.width=Math.ceil(width); warpCanvas.height=Math.ceil(height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     draw();
   }
@@ -104,8 +113,11 @@
     const yx = (p.y*(b.y-c.y)+q.y*(c.y-a.y)+r.y*(a.y-b.y))/det;
     const yy = (p.y*(c.x-b.x)+q.y*(a.x-c.x)+r.y*(b.x-a.x))/det;
     const y0 = (p.y*(b.x*c.y-c.x*b.y)+q.y*(c.x*a.y-a.x*c.y)+r.y*(a.x*b.y-b.x*a.y))/det;
-    ctx.save(); ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.lineTo(r.x,r.y); ctx.closePath(); ctx.clip();
-    ctx.transform(xx,yx,xy,yy,x0,y0); ctx.drawImage(image,0,0); ctx.restore();
+    warp.save(); warp.beginPath(); warp.moveTo(p.x,p.y); warp.lineTo(q.x,q.y); warp.lineTo(r.x,r.y); warp.closePath(); warp.clip();
+    warp.transform(xx,yx,xy,yy,x0,y0);
+    const sx=Math.min(a.x,b.x,c.x), sy=Math.min(a.y,b.y,c.y), sw=Math.max(a.x,b.x,c.x)-sx, sh=Math.max(a.y,b.y,c.y)-sy;
+    if(sw>0 && sh>0) warp.drawImage(image,sx,sy,sw,sh,sx,sy,sw,sh);
+    warp.restore();
   }
   function draw() {
     ctx.clearRect(0,0,width,height); if (!image || !width || !height) return;
@@ -113,21 +125,27 @@
     ctx.fillStyle = '#ded9cf'; ctx.fillRect(0,0,width,height);
     ctx.drawImage(image,ox,oy,iw,ih);
     if (cursor.force < .01 || (!mask && !personMask) || mode) return;
-    ctx.save();
-    if (personMask) {ctx.translate(ox,oy);ctx.scale(iw/personMask.width,ih/personMask.height);ctx.clip(personMask.path);ctx.setTransform(dpr,0,0,dpr,0,0);}
-    else {ctx.beginPath(); mask.forEach((p,i)=>i?ctx.lineTo(ox+p.x*iw,oy+p.y*ih):ctx.moveTo(ox+p.x*iw,oy+p.y*ih));ctx.closePath();ctx.clip();}
-    const cols=24, rows=Math.min(40,Math.max(12,Math.round(cols*ih/iw))), points=[];
+    if (Math.abs(cursor.dx)+Math.abs(cursor.dy)<.02) return;
+    warp.clearRect(0,0,width,height);
+    warp.save();
+    if (!personMask) {warp.beginPath(); mask.forEach((p,i)=>i?warp.lineTo(ox+p.x*iw,oy+p.y*ih):warp.moveTo(ox+p.x*iw,oy+p.y*ih));warp.closePath();warp.clip();}
+    const cols=20, rows=Math.min(32,Math.max(10,Math.round(cols*ih/iw))), points=[];
     const radius=Math.max(75,Math.min(iw,ih)*.24), power=(Number(strength.value)/100)*cursor.force;
     for(let y=0;y<=rows;y++) { points[y]=[]; for(let x=0;x<=cols;x++) {
       const sx=image.width*x/cols, sy=image.height*y/rows, px=ox+iw*x/cols, py=oy+ih*y/rows;
       const dist=Math.hypot(px-cursor.x,py-cursor.y), fall=Math.exp(-dist*dist/(radius*radius))*power;
       points[y][x]={s:{x:sx,y:sy},d:{x:px+cursor.dx*fall*.8,y:py+cursor.dy*fall*.8}};
     }}
-    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) {
+    // A negligible displacement is already represented by the unmodified background.
+    const reach=radius*2.5, xmin=Math.max(0,Math.floor((cursor.x-reach-ox)/iw*cols)), xmax=Math.min(cols-1,Math.floor((cursor.x+reach-ox)/iw*cols));
+    const ymin=Math.max(0,Math.floor((cursor.y-reach-oy)/ih*rows)), ymax=Math.min(rows-1,Math.floor((cursor.y+reach-oy)/ih*rows));
+    for(let y=ymin;y<=ymax;y++) for(let x=xmin;x<=xmax;x++) {
       const a=points[y][x], b=points[y][x+1], c=points[y+1][x], d=points[y+1][x+1];
       triangle([a.s,b.s,c.s],[a.d,b.d,c.d]); triangle([b.s,d.s,c.s],[b.d,d.d,c.d]);
     }
-    ctx.restore();
+    warp.restore();
+    if(personMask) {warp.save();warp.globalCompositeOperation='destination-in';warp.drawImage(personMask,ox,oy,iw,ih);warp.restore();}
+    ctx.drawImage(warpCanvas,0,0,width,height);
   }
   function frame() {
     cursor.dx *= .87; cursor.dy *= .87; cursor.force += ((active ? 1 : 0)-cursor.force)*.12;
