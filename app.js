@@ -106,5 +106,19 @@
   });
   handInput.addEventListener('change',()=>{const file=handInput.files[0];handInput.value='';if(!file)return;if(!targetImage){help.textContent='대상 사진을 먼저 선택해 주세요.';return;}const url=URL.createObjectURL(file),next=new Image();next.onload=()=>{URL.revokeObjectURL(url);image=next;startEditing('hand');};next.onerror=()=>{URL.revokeObjectURL(url);help.textContent='손 사진을 열 수 없습니다. JPG 또는 PNG를 선택해 주세요.';};next.src=url;});
   reset.addEventListener('click',()=>input.click());
+  const defaultImage = new Image();
+  defaultImage.onload = () => {
+    if (imageVersion !== 0) return;
+    image = targetImage = defaultImage;
+    mask = [{x:.535,y:.235},{x:.57,y:.215},{x:.65,y:.208},{x:.73,y:.218},{x:.78,y:.25},{x:.805,y:.31},{x:.83,y:.36},{x:.79,y:.43},{x:.72,y:.47},{x:.63,y:.48},{x:.57,y:.44},{x:.54,y:.38},{x:.525,y:.30}];
+    empty.hidden = true; empty.style.display = 'none'; stage.classList.add('has-image');
+    area.disabled = false; reset.disabled = false;
+    status.textContent = '머리 위를 천천히 쓰다듬어 보세요';
+    help.textContent = '기본 반응 영역이 설정되어 있어요. 영역을 다시 지정할 수도 있습니다.';
+    hint.hidden = false; clearTimeout(hintTimer); hintTimer = setTimeout(() => hint.hidden = true, 5000);
+    draw();
+  };
+  defaultImage.onerror = () => { status.textContent = '기본 사진을 불러올 수 없습니다. 사진을 직접 선택해 주세요.'; };
+  defaultImage.src = 'assets/default-photo.jpg';
   new ResizeObserver(resize).observe(stage);
 })();
