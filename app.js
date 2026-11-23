@@ -14,6 +14,7 @@
   const area = document.querySelector('#area'), finish = document.querySelector('#finish'), cancel = document.querySelector('#cancel');
   const handInput = document.querySelector('#hand-photo'), help = document.querySelector('#editor-help');
   const photoList = document.querySelector('#photo-list');
+  const dragMode = document.querySelector('#drag-mode');
   const presets = [
     ['assets/default-photo.jpg', 'IMG_5607'],
     ...['img_0023','img_0024','img_0031','img_0084','img_0106','img_0110','img_5632','img_5657','img_5683','img_5700','2dc9dfb1-141f-4166-82ba-68819800acf0'].map((name, i) => [`assets/photos/${name}.jpg`, `사진 ${i+2}`])
@@ -149,21 +150,59 @@
   }
   function frame() {
     cursor.dx *= .87; cursor.dy *= .87; cursor.force += ((active ? 1 : 0)-cursor.force)*.12;
-    draw(); if (active || cursor.force > .01) request=requestAnimationFrame(frame); else request=0;
+    draw();
+    const moving=Math.abs(cursor.dx)+Math.abs(cursor.dy)>.02;
+    if (moving || Math.abs((active ? 1 : 0)-cursor.force)>.01) request=requestAnimationFrame(frame); else request=0;
   }
   function animate() { if (!request) request=requestAnimationFrame(frame); }
-  function locate(event) {
+  function locate(event, moving) {
     const rect=stage.getBoundingClientRect(), x=event.clientX-rect.left, y=event.clientY-rect.top;
-    if(active) { cursor.dx=Math.max(-28,Math.min(28,(x-cursor.px)*1.8)); cursor.dy=Math.max(-28,Math.min(28,(y-cursor.py)*1.8)); }
+    if(moving) { cursor.dx=Math.max(-28,Math.min(28,(x-cursor.px)*1.8)); cursor.dy=Math.max(-28,Math.min(28,(y-cursor.py)*1.8)); }
     cursor.x=x; cursor.y=y; cursor.px=x; cursor.py=y;
     hand.style.transform=`translate(${x - hand.offsetWidth*.38}px, ${y - hand.offsetWidth*.35}px) rotate(${Math.max(-12,Math.min(12,cursor.dx))}deg)`;
   }
-  stage.addEventListener('pointerenter',e=>{if(!image || mode)return; locate(e); hand.classList.add('visible');});
-  stage.addEventListener('pointerdown',e=>{if(!image || e.button!==0)return; if(mode){const r=imageRect(), box=stage.getBoundingClientRect(),x=(e.clientX-box.left-r.x)/r.w,y=(e.clientY-box.top-r.y)/r.h;if(x>=0&&x<=1&&y>=0&&y<=1){points.push({x,y});paintOverlay();}return;} active=false; locate(e); active=true; pointerId=e.pointerId; stage.setPointerCapture(e.pointerId); hand.classList.add('visible','pressing'); hint.hidden=true; animate();});
-  stage.addEventListener('pointermove',e=>{if(!image || mode)return; locate(e); if(active) animate();});
-  function release(e){if(e.pointerId!==pointerId)return; active=false; pointerId=null; hand.classList.remove('pressing'); if(e.pointerType==='touch') hand.classList.remove('visible'); animate();}
+  function stopTouch(hideHand=true) {
+    active=false; pointerId=null; cursor.dx=cursor.dy=0; hand.classList.remove('pressing');
+    if(hideHand) hand.classList.remove('visible');
+    animate();
+  }
+  function updateHint() {
+    const touchOnly=window.matchMedia('(hover: none)').matches;
+    hint.innerHTML=touchOnly ? '사진을 손가락으로 문질러 보세요 <span>↗</span>' : dragMode.checked ? '사진을 누른 채 움직여 보세요 <span>↗</span>' : '사진 위에서 마우스를 움직여 보세요 <span>↗</span>';
+    stage.setAttribute('aria-label', touchOnly ? '사진을 손가락으로 문질러 쓰다듬기' : dragMode.checked ? '사진을 누른 채 움직여 쓰다듬기' : '사진 위에서 마우스를 움직여 쓰다듬기');
+  }
+  dragMode.addEventListener('change',()=>{stopTouch();updateHint();});
+  updateHint();
+  stage.addEventListener('pointerenter',e=>{
+    if(!image || mode || e.pointerType==='touch')return;
+    locate(e,false); hand.classList.add('visible');
+    if(!dragMode.checked){active=true;animate();}
+  });
+  stage.addEventListener('pointerdown',e=>{
+    if(!image || !e.isPrimary || e.button!==0)return;
+    if(mode){const r=imageRect(), box=stage.getBoundingClientRect(),x=(e.clientX-box.left-r.x)/r.w,y=(e.clientY-box.top-r.y)/r.h;if(x>=0&&x<=1&&y>=0&&y<=1){points.push({x,y});paintOverlay();}return;}
+    // Touch always requires contact; the switch controls mouse and pen only.
+    if(e.pointerType==='touch' || dragMode.checked){
+      active=false; locate(e,false); active=true; pointerId=e.pointerId; stage.setPointerCapture(e.pointerId);
+      hand.classList.add('visible','pressing'); hint.hidden=true; animate();
+    }
+  });
+  stage.addEventListener('pointermove',e=>{
+    if(!image || mode || !e.isPrimary)return;
+    const hover=e.pointerType!=='touch' && !dragMode.checked;
+    if(e.pointerType==='touch' && e.pointerId!==pointerId)return;
+    if(hover && !active){locate(e,false);active=true;}
+    else locate(e,hover || active);
+    if(hover || active){hand.classList.add('visible');hint.hidden=true;animate();}
+  });
+  function release(e){
+    if(e.pointerId!==pointerId)return;
+    const keepHover=e.pointerType!=='touch' && !dragMode.checked && e.type!=='pointercancel';
+    pointerId=null;hand.classList.remove('pressing');
+    if(!keepHover)stopTouch(e.pointerType==='touch');
+  }
   stage.addEventListener('pointerup',release); stage.addEventListener('pointercancel',release); stage.addEventListener('lostpointercapture',release);
-  stage.addEventListener('pointerleave',()=>{if(!active) hand.classList.remove('visible');});
+  stage.addEventListener('pointerleave',()=>{if(pointerId===null)stopTouch();});
   function showPhoto(next, version) {
     image=targetImage=next; mask=null; personMask=null; focusBounds=null; endEditing();
     area.disabled=false; active=false; cursor.force=0; hand.classList.remove('visible','pressing');
