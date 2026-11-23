@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f3eb"><title>NunaTouch — 사진을 쓰다듬다</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header><a class="brand" href="."><span class="brand-icon">✳</span> NunaTouch</a><span class="tag">A LITTLE MOMENT OF TOUCH</span></header>
+    <section class="intro"><div><p class="eyebrow">YOUR PHOTO, A SOFTER MOMENT</p><h1>사진을 쓰다듬어 보세요<span>.</span></h1><p>좋아하는 사진을 올리고, 손끝으로 천천히 어루만져 보세요.</p></div><label class="upload button" for="photo"><span>＋</span> 사진 불러오기</label><input id="photo" type="file" accept="image/*" hidden></section>
+    <section class="stage-wrap" aria-label="사진 체험 공간">
+      <div id="stage" class="stage" tabindex="0" aria-label="사진 위를 누른 채 움직여 쓰다듬기">
+        <canvas id="canvas"></canvas>
+        <div id="empty" class="empty"><div class="empty-icon">✳</div><h2>당신의 사진을 기다리고 있어요</h2><p>고양이, 강아지, 혹은 소중한 순간까지.<br>사진을 불러와 직접 만져 보세요.</p><label for="photo" class="empty-button">사진 선택하기 <span>↗</span></label><small>사진은 이 기기에서만 처리됩니다</small></div>
+        <canvas id="overlay" class="overlay" aria-hidden="true"></canvas><div id="hand" class="hand" aria-hidden="true"><img src="assets/hand.png" alt=""></div>
+        <div id="hint" class="hint" hidden>사진 위를 누른 채 움직여 보세요 <span>↗</span></div>
+      </div>
+      <div class="editor"><button id="area" disabled>1. 반응 영역 지정</button><label class="editor-button" for="hand-photo">2. 손 사진 선택</label><input id="hand-photo" type="file" accept="image/*" hidden><button id="finish" disabled>영역 완료</button><button id="cancel" disabled>취소</button><span id="editor-help">대상 사진을 먼저 선택해 주세요.</span></div><div class="controls"><div class="status"><span class="status-dot"></span><span id="status">사진을 선택해 시작하세요</span></div><div class="tools"><label for="strength">터치 강도</label><input id="strength" type="range" min="0" max="100" value="50" aria-label="터치 강도"><button id="reset" type="button" disabled>다시 선택</button></div></div>
+    </section>
+    <footer><span>MADE FOR A GENTLE MOMENT</span><span>사진은 업로드되지 않아요 <b>✳</b></span></footer>
+  </main><script src="app.js"></script>
+</body></html>
