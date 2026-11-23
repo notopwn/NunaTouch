@@ -12,6 +12,20 @@
   const overlay = document.querySelector('#overlay'), octx = overlay.getContext('2d');
   const area = document.querySelector('#area'), finish = document.querySelector('#finish'), cancel = document.querySelector('#cancel');
   const handInput = document.querySelector('#hand-photo'), help = document.querySelector('#editor-help');
+  const photoList = document.querySelector('#photo-list');
+  const presets = [
+    ['assets/default-photo.jpg', 'IMG_5607'],
+    ...['img_0023','img_0024','img_0031','img_0084','img_0106','img_0110','img_5632','img_5657','img_5683','img_5700','2dc9dfb1-141f-4166-82ba-68819800acf0'].map((name, i) => [`assets/photos/${name}.jpg`, `사진 ${i+2}`])
+  ];
+  function selectPreset(index) {
+    photoList.querySelectorAll('button').forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)));
+  }
+  presets.forEach(([src, label], i) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'photo-choice'; button.setAttribute('aria-label', `${label} 선택`); button.setAttribute('aria-pressed', String(i === 0));
+    const thumbnail = document.createElement('img'); thumbnail.src = src; thumbnail.alt = ''; thumbnail.loading = 'lazy';
+    button.append(thumbnail); button.addEventListener('click', () => loadPreset(i)); photoList.append(button);
+  });
   let mode = null, points = [], targetImage = null, mask = null, personMask = null, focusBounds = null, segmenterPromise = null;
   function imageRect() {
     const focused = image === targetImage && focusBounds;
@@ -132,11 +146,29 @@
   function release(e){if(e.pointerId!==pointerId)return; active=false; pointerId=null; hand.classList.remove('pressing'); if(e.pointerType==='touch') hand.classList.remove('visible'); animate();}
   stage.addEventListener('pointerup',release); stage.addEventListener('pointercancel',release); stage.addEventListener('lostpointercapture',release);
   stage.addEventListener('pointerleave',()=>{if(!active) hand.classList.remove('visible');});
+  function showPhoto(next, version) {
+    image=targetImage=next; mask=null; personMask=null; focusBounds=null; endEditing();
+    area.disabled=false; active=false; cursor.force=0; hand.classList.remove('visible','pressing');
+    empty.hidden=true; empty.style.display='none'; stage.classList.add('has-image'); reset.disabled=false;
+    status.textContent='사진 위를 천천히 쓰다듬어 보세요'; hint.hidden=false;
+    clearTimeout(hintTimer); hintTimer=setTimeout(()=>hint.hidden=true,5000); draw();
+    help.textContent='인물 자동 인식을 시도하고 있어요…'; detectPerson(next,version);
+  }
+  function loadPreset(index) {
+    const version=++imageVersion, next=new Image();
+    next.onload=()=>{
+      if(version!==imageVersion)return;
+      if(index===0) { setDefault(next); selectPreset(index); return; }
+      selectPreset(index); showPhoto(next,version);
+    };
+    next.onerror=()=>{if(version===imageVersion) status.textContent='사진을 불러올 수 없습니다. 다른 사진을 선택해 주세요.';};
+    next.src=presets[index][0];
+  }
   input.addEventListener('change',()=>{
     const file=input.files[0]; if(!file)return;
     if(!file.type.startsWith('image/')){status.textContent='이미지 파일을 선택해 주세요'; input.value=''; return;}
     const version=++imageVersion, url=URL.createObjectURL(file), next=new Image();
-    next.onload=()=>{URL.revokeObjectURL(url); if(version!==imageVersion)return; image=next; targetImage=next; mask=null; personMask=null; focusBounds=null; endEditing(); area.disabled=false; help.textContent='반응 영역을 먼저 지정한 뒤 손 사진을 선택하세요.'; active=false; cursor.force=0; empty.hidden=true; empty.style.display='none'; stage.classList.add('has-image'); reset.disabled=false; status.textContent='사진 위를 천천히 쓰다듬어 보세요'; hint.hidden=false; clearTimeout(hintTimer); hintTimer=setTimeout(()=>hint.hidden=true,5000); draw(); help.textContent='인물 자동 인식을 시도하고 있어요…'; detectPerson(next,version);};
+    next.onload=()=>{URL.revokeObjectURL(url); if(version!==imageVersion)return; selectPreset(-1); showPhoto(next,version);};
     next.onerror=()=>{URL.revokeObjectURL(url); if(version===imageVersion) status.textContent='사진을 열 수 없습니다. 다른 파일을 선택해 주세요.';};
     next.src=url; input.value='';
   });
@@ -153,10 +185,8 @@
   });
   handInput.addEventListener('change',()=>{const file=handInput.files[0];handInput.value='';if(!file)return;if(!targetImage){help.textContent='대상 사진을 먼저 선택해 주세요.';return;}const url=URL.createObjectURL(file),next=new Image();next.onload=()=>{URL.revokeObjectURL(url);image=next;startEditing('hand');};next.onerror=()=>{URL.revokeObjectURL(url);help.textContent='손 사진을 열 수 없습니다. JPG 또는 PNG를 선택해 주세요.';};next.src=url;});
   reset.addEventListener('click',()=>input.click());
-  const defaultImage = new Image();
-  defaultImage.onload = () => {
-    if (imageVersion !== 0) return;
-    image = targetImage = defaultImage;
+  function setDefault(defaultImage) {
+    image = targetImage = defaultImage; personMask=null; endEditing(); active=false; cursor.force=0; hand.classList.remove('visible','pressing');
     mask = [{x:.535,y:.30},{x:.54,y:.265},{x:.56,y:.245},{x:.60,y:.225},{x:.66,y:.21},{x:.72,y:.215},{x:.77,y:.235},{x:.80,y:.28},{x:.82,y:.33},{x:.85,y:.37},{x:.89,y:.40},{x:.94,y:.46},{x:.965,y:.52},{x:.965,y:.61},{x:.955,y:.68},{x:.94,y:.74},{x:.91,y:.80},{x:.86,y:.85},{x:.79,y:.875},{x:.72,y:.88},{x:.66,y:.865},{x:.61,y:.85},{x:.56,y:.83},{x:.51,y:.80},{x:.48,y:.76},{x:.47,y:.71},{x:.47,y:.66},{x:.46,y:.62},{x:.475,y:.57},{x:.49,y:.52},{x:.48,y:.48},{x:.47,y:.45},{x:.48,y:.43},{x:.50,y:.44},{x:.52,y:.47},{x:.55,y:.48},{x:.56,y:.44},{x:.56,y:.40},{x:.545,y:.35}];
     focusBounds = {left:.46,top:.21,right:.965,bottom:.88};
     empty.hidden = true; empty.style.display = 'none'; stage.classList.add('has-image');
@@ -165,8 +195,7 @@
     help.textContent = '기본 반응 영역이 설정되어 있어요. 영역을 다시 지정할 수도 있습니다.';
     hint.hidden = false; clearTimeout(hintTimer); hintTimer = setTimeout(() => hint.hidden = true, 5000);
     draw();
-  };
-  defaultImage.onerror = () => { status.textContent = '기본 사진을 불러올 수 없습니다. 사진을 직접 선택해 주세요.'; };
-  defaultImage.src = 'assets/default-photo.jpg';
+  }
+  loadPreset(0);
   new ResizeObserver(resize).observe(stage);
 })();
