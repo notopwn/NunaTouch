@@ -8,3 +8,4 @@
 @media(max-width:650px){.editor button,.editor-button{min-height:44px}.tools button{min-height:44px}.photo-list{-webkit-overflow-scrolling:touch;touch-action:pan-x}.mode-option{min-height:44px}}
 
 .intro .eyebrow{font-size:16px;letter-spacing:-.3px;font-weight:600;margin-bottom:12px}
+.leaderboard{margin:36px 0;padding:28px;border:1px solid #e5ded2;border-radius:20px;background:#fff}.leaderboard h2{margin:4px 0}.leaderboard-list{list-style:none;padding:0;line-height:2}.leaderboard small{color:#756b60}dialog{border:0;border-radius:20px;padding:30px;max-width:calc(100vw - 48px);box-shadow:0 20px 70px #0003}dialog::backdrop{background:#211b16aa}dialog form{display:grid;gap:12px}dialog h2,dialog p{margin:0}dialog input{padding:12px;border:1px solid #ccc;border-radius:8px;font:inherit}dialog button{padding:12px;border:0;border-radius:8px;background:#6b4b3c;color:white;font:inherit;cursor:pointer}
