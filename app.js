@@ -155,8 +155,25 @@
     if (moving || Math.abs((active ? 1 : 0)-cursor.force)>.01) request=requestAnimationFrame(frame); else request=0;
   }
   function animate() { if (!request) request=requestAnimationFrame(frame); }
+  let sampledMask = null, sampledPixels = null;
+  function scoreMovement(x0,y0,x1,y1) {
+    if (!image || (!personMask && !mask) || mode) return;
+    const r=imageRect(), distance=Math.hypot(x1-x0,y1-y0);
+    if (!distance || !r.w || !r.h) return;
+    if (personMask && sampledMask !== personMask) { sampledMask=personMask; sampledPixels=personMask.getContext('2d').getImageData(0,0,personMask.width,personMask.height).data; }
+    function inside(x,y) {
+      const u=(x-r.x)/r.w,v=(y-r.y)/r.h;
+      if(u<0 || u>=1 || v<0 || v>=1 || x<0 || y<0 || x>=width || y>=height) return false;
+      if(personMask) return sampledPixels[(Math.floor(v*personMask.height)*personMask.width+Math.floor(u*personMask.width))*4+3]>=128;
+      let hit=false; for(let i=0,j=mask.length-1;i<mask.length;j=i++) {const a=mask[i],b=mask[j]; if((a.y>v)!==(b.y>v) && u<(b.x-a.x)*(v-a.y)/(b.y-a.y)+a.x) hit=!hit;} return hit;
+    }
+    const steps=Math.max(1,Math.ceil(distance/4)); let count=0;
+    for(let i=0;i<steps;i++){const t=(i+.5)/steps;if(inside(x0+(x1-x0)*t,y0+(y1-y0)*t))count++;}
+    window.NunaScore?.add(distance*count/steps/Math.min(r.w,r.h)*10);
+  }
   function locate(event, moving) {
     const rect=stage.getBoundingClientRect(), x=event.clientX-rect.left, y=event.clientY-rect.top;
+    if(moving) scoreMovement(cursor.px,cursor.py,x,y);
     if(moving) { cursor.dx=Math.max(-28,Math.min(28,(x-cursor.px)*1.8)); cursor.dy=Math.max(-28,Math.min(28,(y-cursor.py)*1.8)); }
     cursor.x=x; cursor.y=y; cursor.px=x; cursor.py=y;
     hand.style.transform=`translate(${x - hand.offsetWidth*.38}px, ${y - hand.offsetWidth*.35}px) rotate(${Math.max(-12,Math.min(12,cursor.dx))}deg)`;
