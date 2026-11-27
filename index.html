@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f3eb"><title>NunaTouch</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <main class="app">
@@ -25,6 +25,8 @@
     <section class="interaction-options" aria-label="사용 방법 설정">
       <label class="mode-option" for="drag-mode"><span><strong>클릭하고 드래그해서 쓰다듬기</strong><small>끄면 마우스를 움직이는 것만으로 쓰다듬을 수 있어요. 모바일은 손가락으로 문질러 주세요.</small></span><input id="drag-mode" type="checkbox" role="switch"></label>
     </section>
+    <section class="leaderboard" aria-labelledby="leaderboard-title"><p class="eyebrow">LEADERBOARD</p><h2 id="leaderboard-title">쓰다듬기 순위</h2><p>이번 세션 <strong id="session-score">0점</strong></p><ol id="leaderboard-list" class="leaderboard-list"></ol><small id="leaderboard-message"></small></section>
+    <dialog id="name-dialog"><form id="name-form"><h2>이름을 알려주세요</h2><p>같은 이름의 점수는 함께 쌓여요.</p><label for="player-name">이름</label><input id="player-name" maxlength="30" required autocomplete="nickname"><button type="submit">시작하기</button></form></dialog>
     <footer><span>MADE FOR A GENTLE MOMENT</span><span>사진은 업로드되지 않아요 <b>✳</b></span></footer>
-  </main><script src="app.js?v=6"></script>
+  </main><script src="leaderboard-config.js"></script><script src="leaderboard.js"></script><script src="app.js?v=7"></script>
 </body></html>
